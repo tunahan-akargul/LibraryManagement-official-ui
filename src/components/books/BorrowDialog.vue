@@ -62,13 +62,12 @@ async function handleConfirm() {
     const borrowedAt = toDateString(new Date())
     const dueDate    = toDateString(returnDate.value)
 
-    // Store'daki doğru ismi kullanıyoruz: currentUser
     if (!authStore.currentUser?.id) {
-      alert('Hacı giriş yapmadan nasıl kitap alıyon? Önce bi login ol lan!');
-      return;
+      alert('Önce giriş yapmalısınız.')
+      return
     }
-    
-    await bookStore.borrowBook(props.book.id, borrowedAt, dueDate, authStore.currentUser.id);
+
+    await bookStore.borrowBook(props.book.id, borrowedAt, dueDate)
     emit('success')
   } finally {
     loading.value = false

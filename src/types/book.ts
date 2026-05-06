@@ -8,7 +8,7 @@ export interface Book {
   published_year?: number; // DB: published_year
   genre?: string;
   standard_return_days: number; // DB: standard_return_days
-  status: 'available' | 'borrowed' | 'lost' | 'damaged'; // DB: status
+  status: 'available' | 'borrow_pending' | 'borrowed' | 'return_pending' | 'lost' | 'damaged'; // DB: status
   rating?: number | string;
   cover_image?: string; // DB: cover_image
   borrowed_at?: string; // DB: borrowed_at

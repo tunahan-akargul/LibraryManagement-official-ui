@@ -136,7 +136,11 @@ export default {
   // Status
   status: {
     available: 'Mevcut',
+    borrow_pending: 'Onay Bekliyor',
     borrowed: 'Ödünç',
+    return_pending: 'İade Onay Bekliyor',
+    lost: 'Kayıp',
+    damaged: 'Hasarlı',
   },
 
   // Language

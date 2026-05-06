@@ -3,8 +3,10 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBookStore } from '@/store/books'
+import { useAuthStore } from '@/store/auth'
 
 const bookStore = useBookStore()
+const auth      = useAuthStore()
 const router    = useRouter()
 
 onMounted(() => {
@@ -20,6 +22,15 @@ const availableCount = computed(
 
 const borrowedCount = computed(
   () => bookStore.books.filter((b) => b.status === 'borrowed').length
+)
+
+const myActiveLoans = computed(
+  () =>
+    auth.currentUser
+      ? bookStore.books.filter(
+          (b) => b.status === 'borrowed' && b.borrower_id === auth.currentUser!.id,
+        ).length
+      : 0,
 )
 
 // ── Kapak URL'si: önce cover_image, yoksa isbn ile OpenLibrary ────
@@ -204,7 +215,10 @@ const featuredBooks = [
         </div>
         <div>
           <div class="stat-card__label">{{ $t('dashboard.myActiveLoans') }}</div>
-          <div class="stat-card__value stat-card__value--purple">3</div>
+          <div class="stat-card__value stat-card__value--purple">
+            <span v-if="bookStore.loading" class="stat-skeleton" />
+            <span v-else>{{ myActiveLoans }}</span>
+          </div>
         </div>
       </div>
     </div>

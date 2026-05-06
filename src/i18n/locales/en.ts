@@ -136,7 +136,11 @@
   // Status
   status: {
     available: 'Available',
+    borrow_pending: 'Pending Approval',
     borrowed: 'Borrowed',
+    return_pending: 'Return Pending',
+    lost: 'Lost',
+    damaged: 'Damaged',
   },
 
   // Language

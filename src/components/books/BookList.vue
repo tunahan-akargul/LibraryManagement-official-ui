@@ -112,23 +112,19 @@ function returnChip(book: Book): { label: string; color: string; icon: string } 
 /** Durum rozetinin CSS sınıfı */
 function statusBadgeClass(status: Book['status']): string {
   switch (status) {
-    case 'available': return 'book-card__status-badge--ok'
-    case 'borrowed':  return 'book-card__status-badge--no'
-    case 'lost':      return 'book-card__status-badge--lost'
-    case 'damaged':   return 'book-card__status-badge--damaged'
-    default:          return ''
+    case 'available':      return 'book-card__status-badge--ok'
+    case 'borrow_pending': return 'book-card__status-badge--pending'
+    case 'borrowed':       return 'book-card__status-badge--no'
+    case 'return_pending': return 'book-card__status-badge--pending'
+    case 'lost':           return 'book-card__status-badge--lost'
+    case 'damaged':        return 'book-card__status-badge--damaged'
+    default:               return ''
   }
 }
 
 /** Durum rozeti metni */
 function statusLabel(status: Book['status']): string {
-  switch (status) {
-    case 'available': return t('status.available')
-    case 'borrowed':  return t('status.borrowed')
-    case 'lost':      return t('status.lost')
-    case 'damaged':   return t('status.damaged')
-    default:          return status
-  }
+  return t(`status.${status}`)
 }
 
 const skeletonItems = Array.from({ length: 8 })
@@ -371,6 +367,11 @@ const skeletonItems = Array.from({ length: 8 })
 
 .book-card__status-badge--damaged {
   background: rgba(214, 158, 46, 0.9);
+  color: #fff;
+}
+
+.book-card__status-badge--pending {
+  background: rgba(180, 83, 9, 0.88);
   color: #fff;
 }
 

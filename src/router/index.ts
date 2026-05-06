@@ -36,12 +36,6 @@ const router = createRouter({
       meta: { titleKey: 'topbar.bookDetails', requiresAuth: true },
     },
     {
-      path: '/admin/inventory',
-      name: 'inventory',
-      component: () => import('@/views/admin/InventoryView.vue'),
-      meta: { titleKey: 'nav.inventory', requiresAuth: true, requiresAdmin: true },
-    },
-    {
       path: '/my-books',
       name: 'my-books',
       component: () => import('@/views/MyBooksView.vue'),
@@ -63,23 +57,15 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
   const t = i18n.global.t
 
-  // Sayfa başlığı
   const base = 'KTÜ Kütüphanesi'
   const titleKey = to.meta.titleKey as string | undefined
   document.title = titleKey ? `${t(titleKey)} — ${base}` : base
 
-  // Giriş gerektiren sayfa → giriş yapılmamışsa /login'e yönlendir
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  // Sadece misafir sayfası (login) → zaten giriş yapılmışsa ana sayfaya yönlendir
   if (to.meta.guestOnly && auth.isAuthenticated) {
-    return { name: 'home' }
-  }
-
-  // Admin koruması → admin değilse ana sayfaya yönlendir
-  if (to.meta.requiresAdmin && !auth.isAdmin) {
     return { name: 'home' }
   }
 })

@@ -29,7 +29,6 @@ const breadcrumb = () => {
     '/': t('nav.dashboard'),
     '/books': t('nav.catalog'),
     '/my-books': t('nav.myBooks'),
-    '/admin/inventory': t('nav.adminInventory'),
   }
   if (route.path.startsWith('/books/')) return t('topbar.bookDetails')
   return map[route.path] || t('topbar.page')

@@ -17,21 +17,11 @@ const router = useRouter()
 const { t } = useI18n()
 const auth = useAuthStore()
 
-const navItems = computed(() => {
-  // Herkese görünen standart liste
-  const items = [
-    { label: t('nav.dashboard'),      path: '/',                icon: 'mdi-view-dashboard-outline' },
-    { label: t('nav.catalog'),        path: '/books',           icon: 'mdi-book-multiple-outline' },
-    { label: t('nav.myBooks'),        path: '/my-books',        icon: 'mdi-bookshelf' },
-  ]
-
-  // Reaktiviteyi zorluyoruz: Eğer kullanıcı adminse, yetki geldiği an listeye ekle!
-  if (auth.isAdmin) {
-    items.push({ label: t('nav.adminInventory'), path: '/admin/inventory', icon: 'mdi-table-edit' })
-  }
-
-  return items
-})
+const navItems = computed(() => [
+  { label: t('nav.dashboard'), path: '/',         icon: 'mdi-view-dashboard-outline' },
+  { label: t('nav.catalog'),   path: '/books',    icon: 'mdi-book-multiple-outline' },
+  { label: t('nav.myBooks'),   path: '/my-books', icon: 'mdi-bookshelf' },
+])
 
 const isActive = (path: string) => {
   if (path === '/') return route.path === '/'

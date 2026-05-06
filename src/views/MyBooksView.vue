@@ -1,86 +1,91 @@
 <script setup lang="ts">
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useBookStore } from '@/store/books'
+import { useAuthStore } from '@/store/auth'
+import type { Book } from '@/types/book'
 
 const { t, locale } = useI18n()
-const router = useRouter()
+const router    = useRouter()
+const bookStore = useBookStore()
+const auth      = useAuthStore()
 
-// --- HOCANIN GÖRECEĞİ TEMİZ SAHTE VERİLER ---
-const borrowedBooks = [
-  { 
-    id: 1, 
-    title: 'Nutuk', 
-    author: 'Mustafa Kemal Atatürk', 
-    isbn: '9789751601728', 
-    borrowedDate: '2026-05-01', 
-    dueDate: '2026-05-20' 
-  },
-  { 
-    id: 2, 
-    title: 'Sefiller', 
-    author: 'Victor Hugo', 
-    isbn: '9789750719165', 
-    borrowedDate: '2026-04-25', 
-    dueDate: '2026-05-05' 
-  },
-  { 
-    id: 3, 
-    title: 'Simyacı', 
-    author: 'Paulo Coelho', 
-    isbn: '9789750726439', 
-    borrowedDate: '2026-04-10', 
-    dueDate: '2026-04-24' 
-  },
-  { 
-    id: 4, 
-    title: 'Suç ve Ceza', 
-    author: 'Fyodor Dostoyevski', 
-    isbn: '9789750719370', 
-    borrowedDate: '2026-03-01', 
-    dueDate: '2026-03-15',
-    isReturned: true 
-  }
-]
+onMounted(() => {
+  if (!bookStore.books.length) bookStore.fetchBooks()
+})
 
-const formatDate = (d: string) =>
-  new Date(d).toLocaleDateString(locale.value === 'tr' ? 'tr-TR' : 'en-US', {
-    year: 'numeric', month: 'short', day: 'numeric',
-  })
+// Kullanıcının üzerine atanmış tüm kitaplar (onay bekleyen, ödünç alınan, iade onayı bekleyen).
+const myBorrowedBooks = computed<Book[]>(() => {
+  const myId = auth.currentUser?.id
+  if (!myId) return []
+  const ACTIVE: Book['status'][] = ['borrow_pending', 'borrowed', 'return_pending']
+  return bookStore.books.filter(
+    (b) => b.borrower_id === myId && ACTIVE.includes(b.status),
+  )
+})
+
+const formatDate = (d?: string | null) =>
+  d
+    ? new Date(d).toLocaleDateString(locale.value === 'tr' ? 'tr-TR' : 'en-US', {
+        year: 'numeric', month: 'short', day: 'numeric',
+      })
+    : '—'
 
 const daysLeft = (due: string) =>
   Math.ceil((new Date(due).getTime() - Date.now()) / 86400000)
 
-const dueStatus = (book: any) => {
-  if (book.isReturned) return { label: t('myBooks.returned'), cls: 'due--returned', icon: 'mdi-check-all' }
-  const d = daysLeft(book.dueDate)
-  if (d <= 0)  return { label: t('myBooks.overdue'), cls: 'due--danger',  icon: 'mdi-alert-circle-outline' }
-  if (d <= 3)  return { label: `${d} ${t('myBooks.daysLeft')}`, cls: 'due--danger',  icon: 'mdi-clock-alert-outline' }
-  if (d <= 7)  return { label: `${d} ${t('myBooks.daysLeft')}`, cls: 'due--warning', icon: 'mdi-clock-outline' }
-  return        { label: `${d} ${t('myBooks.daysLeft')}`, cls: 'due--ok',      icon: 'mdi-check-circle-outline' }
+const dueStatus = (book: Book) => {
+  if (book.status === 'borrow_pending') {
+    return { label: t('status.borrow_pending'), cls: 'due--pending', icon: 'mdi-clock-time-eight-outline' }
+  }
+  if (book.status === 'return_pending') {
+    return { label: t('status.return_pending'), cls: 'due--pending', icon: 'mdi-clock-time-eight-outline' }
+  }
+  if (!book.due_date) return { label: '—', cls: 'due--ok', icon: 'mdi-clock-outline' }
+  const d = daysLeft(book.due_date)
+  if (d <= 0)  return { label: t('myBooks.overdue'),                   cls: 'due--danger',  icon: 'mdi-alert-circle-outline' }
+  if (d <= 3)  return { label: `${d} ${t('myBooks.daysLeft')}`,        cls: 'due--danger',  icon: 'mdi-clock-alert-outline' }
+  if (d <= 7)  return { label: `${d} ${t('myBooks.daysLeft')}`,        cls: 'due--warning', icon: 'mdi-clock-outline' }
+  return         { label: `${d} ${t('myBooks.daysLeft')}`,             cls: 'due--ok',      icon: 'mdi-check-circle-outline' }
 }
 
-const coverUrl = (isbn: string) =>
-  `https://covers.openlibrary.org/b/isbn/${isbn}-S.jpg`
+const coverUrl = (book: Book): string | null => {
+  if (book.cover_image) {
+    return book.cover_image.startsWith('http')
+      ? book.cover_image
+      : `http://localhost:8080/${book.cover_image}`
+  }
+  if (book.isbn) return `https://covers.openlibrary.org/b/isbn/${book.isbn}-S.jpg`
+  return null
+}
 
-  const returnBook = (title: string) => {
-  alert(`${title} kitabı için iade talebi alındı. (Frontend Modu)`)
+async function handleReturn(book: Book) {
+  if (!confirm(`"${book.title}" kitabını iade etmek istediğinize emin misiniz?`)) return
+  await bookStore.returnBook(book.id)
+}
+
+function canRequestReturn(book: Book): boolean {
+  return book.status === 'borrowed'
+}
+
+function goToBook(id: number) {
+  router.push(`/books/${id}`)
 }
 </script>
 
 <template>
   <div class="my-books-view">
-    <!-- Header -->
     <div class="page-header">
       <div>
         <h1 class="page-title">{{ t('myBooks.title') }}</h1>
         <p class="page-sub">
-          {{ borrowedBooks.length }} {{ t('myBooks.activeLoans', borrowedBooks.length) }}
+          {{ myBorrowedBooks.length }} {{ t('myBooks.activeLoans', myBorrowedBooks.length) }}
         </p>
       </div>
     </div>
 
-    <!-- Empty -->
-    <div v-if="!borrowedBooks.length" class="empty-state">
+    <div v-if="!myBorrowedBooks.length" class="empty-state">
       <div class="empty-icon">
         <v-icon size="48" color="primary" style="opacity:0.2">mdi-book-off-outline</v-icon>
       </div>
@@ -90,93 +95,83 @@ const coverUrl = (isbn: string) =>
       </v-btn>
     </div>
 
-    <!-- Loan Cards -->
     <div v-else class="loans-list">
       <div
-        v-for="(book, idx) in borrowedBooks"
+        v-for="(book, idx) in myBorrowedBooks"
         :key="book.id"
         class="loan-card"
-        @click="console.log('Detay sayfası şu anlık devre dışı bırakıldı reis!')"
+        @click="goToBook(book.id)"
       >
-        <!-- Index -->
         <div class="loan-idx">{{ idx + 1 }}</div>
 
-        <!-- Cover thumb -->
         <div class="loan-thumb">
-          <!-- Sadece ISBN varsa resmi yüklemeye çalış amk -->
           <img
-            v-if="book.isbn"
-            :src="coverUrl(book.isbn)"
+            v-if="coverUrl(book)"
+            :src="coverUrl(book)!"
             :alt="book.title"
             class="loan-thumb__img"
           />
-          <!-- Resim yoksa veya yüklenmezse bu ikon çıksın -->
-          <div class="loan-thumb__fallback">
+          <div v-else class="loan-thumb__fallback">
             <v-icon size="20" color="white" style="opacity:0.4">mdi-book-open-variant</v-icon>
           </div>
         </div>
 
-        <!-- Info -->
         <div class="loan-info">
           <div class="loan-title">{{ book.title }}</div>
           <div class="loan-author">{{ book.author }}</div>
         </div>
 
-        <!-- Dates -->
         <div class="loan-dates">
           <div class="loan-date-item">
             <span class="loan-date-label">{{ t('table.borrowedDate') }}</span>
-            <span class="loan-date-val">{{ formatDate(book.borrowedDate) }}</span>
+            <span class="loan-date-val">{{ formatDate(book.borrowed_at) }}</span>
           </div>
           <div class="loan-date-item">
             <span class="loan-date-label">{{ t('table.dueDate') }}</span>
-            <span class="loan-date-val">{{ formatDate(book.dueDate) }}</span>
+            <span class="loan-date-val">{{ formatDate(book.due_date) }}</span>
           </div>
         </div>
 
-        <!-- Durum Rozeti -->
         <div class="loan-due" :class="dueStatus(book).cls">
           <v-icon size="13" class="me-1">{{ dueStatus(book).icon }}</v-icon>
           {{ dueStatus(book).label }}
         </div>
 
-        <!-- İade Et Butonu (Sadece iade edilmemişse göster) -->
         <v-btn
-          v-if="!book.isReturned"
+          v-if="canRequestReturn(book)"
           color="primary"
           variant="tonal"
           size="small"
           rounded="lg"
           class="ms-4 font-weight-bold"
           prepend-icon="mdi-keyboard-return"
-          @click.stop="returnBook(book.title)"
+          :loading="bookStore.loading"
+          @click.stop="handleReturn(book)"
         >
           {{ t('myBooks.return') }}
         </v-btn>
+
+        <v-chip
+          v-else
+          size="small"
+          variant="tonal"
+          color="amber-darken-2"
+          label
+          class="ms-4"
+        >
+          <v-icon size="14" start>mdi-clock-time-eight-outline</v-icon>
+          {{ book.status === 'borrow_pending' ? t('status.borrow_pending') : t('status.return_pending') }}
+        </v-chip>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.my-books-view {
-  max-width: 900px;
-  padding-bottom: 48px;
-}
-
-.page-header { margin-bottom: 28px; }
-
-.page-title {
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.page-sub {
-  font-size: 0.82rem;
-  color: rgba(var(--v-theme-on-surface), 0.42);
-  margin-top: 4px;
-}
+.my-books-view { max-width: 900px; padding-bottom: 48px; }
+.page-header   { margin-bottom: 28px; }
+.page-title    { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
+.page-sub      { font-size: 0.82rem; color: rgba(var(--v-theme-on-surface), 0.42); margin-top: 4px; }
 
 .empty-state {
   display: flex;
@@ -197,16 +192,9 @@ const coverUrl = (isbn: string) =>
   justify-content: center;
 }
 
-.empty-label {
-  font-size: 0.9rem;
-  color: rgba(var(--v-theme-on-surface), 0.45);
-}
+.empty-label { font-size: 0.9rem; color: rgba(var(--v-theme-on-surface), 0.45); }
 
-.loans-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+.loans-list  { display: flex; flex-direction: column; gap: 10px; }
 
 .loan-card {
   display: flex;
@@ -256,64 +244,17 @@ const coverUrl = (isbn: string) =>
   inset: 0;
 }
 
-.loan-thumb__fallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+.loan-thumb__fallback { display: flex; align-items: center; justify-content: center; }
+.loan-info  { flex: 1; min-width: 0; }
+.loan-title { font-size: 0.87rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.loan-author{ font-size: 0.73rem; color: rgba(var(--v-theme-on-surface), 0.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.loan-info {
-  flex: 1;
-  min-width: 0;
-}
+.loan-dates { display: flex; gap: 20px; flex-shrink: 0; }
+@media (max-width: 640px) { .loan-dates { display: none; } }
 
-.loan-title {
-  font-size: 0.87rem;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 3px;
-}
-
-.loan-author {
-  font-size: 0.73rem;
-  color: rgba(var(--v-theme-on-surface), 0.45);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.loan-dates {
-  display: flex;
-  gap: 20px;
-  flex-shrink: 0;
-}
-
-@media (max-width: 640px) {
-  .loan-dates { display: none; }
-}
-
-.loan-date-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.loan-date-label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: rgba(var(--v-theme-on-surface), 0.35);
-}
-
-.loan-date-val {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: rgba(var(--v-theme-on-surface), 0.75);
-  white-space: nowrap;
-}
+.loan-date-item  { display: flex; flex-direction: column; gap: 2px; }
+.loan-date-label { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: rgba(var(--v-theme-on-surface), 0.35); }
+.loan-date-val   { font-size: 0.78rem; font-weight: 600; color: rgba(var(--v-theme-on-surface), 0.75); white-space: nowrap; }
 
 .loan-due {
   display: inline-flex;
@@ -325,9 +266,8 @@ const coverUrl = (isbn: string) =>
   white-space: nowrap;
   flex-shrink: 0;
 }
-
-.due--ok      { background: rgba(34,197,94,0.1);  color: #16a34a; }
+.due--ok      { background: rgba(34,197,94,0.1);   color: #16a34a; }
 .due--warning { background: rgba(245,158,11,0.12); color: #d97706; }
-.due--danger  { background: rgba(239,68,68,0.1);  color: #dc2626; }
-.due--returned { background: rgba(var(--v-theme-on-surface), 0.08); color: rgba(var(--v-theme-on-surface), 0.6); }
+.due--danger  { background: rgba(239,68,68,0.1);   color: #dc2626; }
+.due--pending { background: rgba(245,158,11,0.18); color: #b45309; }
 </style>

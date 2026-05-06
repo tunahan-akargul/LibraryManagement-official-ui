@@ -15,23 +15,44 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => currentUser.value !== null && token.value !== null)
   const isAdmin = computed(() => currentUser.value?.role === 'admin')
 
+  function persist(t: string, u: User) {
+    token.value = t
+    currentUser.value = u
+    localStorage.setItem(TOKEN_KEY, t)
+    localStorage.setItem(USER_KEY, JSON.stringify(u))
+  }
+
   async function login(
     email: string,
     password: string
   ): Promise<{ success: boolean; message: string }> {
     try {
       const { data } = await api.post('/auth/login', { email, password })
-
-      token.value = data.token
-      currentUser.value = data.user
-
-      localStorage.setItem(TOKEN_KEY, data.token)
-      localStorage.setItem(USER_KEY, JSON.stringify(data.user))
-
+      persist(data.token, data.user)
       return { success: true, message: data.message ?? 'Giriş başarılı.' }
     } catch (err: any) {
       const message =
         err.response?.data?.message ?? 'E-posta veya şifre hatalı.'
+      return { success: false, message }
+    }
+  }
+
+  async function register(
+    name: string,
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const { data } = await api.post('/auth/register', { name, email, password })
+      persist(data.token, data.user)
+      return { success: true, message: data.message ?? 'Kayıt başarılı.' }
+    } catch (err: any) {
+      const errors = err.response?.data?.errors
+      const errorList = errors ? Object.values(errors).join(' ') : ''
+      const message =
+        err.response?.data?.message ||
+        errorList ||
+        'Kayıt sırasında bir hata oluştu.'
       return { success: false, message }
     }
   }
@@ -43,5 +64,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(USER_KEY)
   }
 
-  return { token, currentUser, isAuthenticated, isAdmin, login, logout }
+  return { token, currentUser, isAuthenticated, isAdmin, login, register, logout }
 })
