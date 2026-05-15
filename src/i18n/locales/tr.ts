@@ -76,7 +76,7 @@ export default {
     title: 'Kitabı Ödünç Al',
     confirmText: 'Bu kitabı ödünç almak istediğinizden emin misiniz?',
     returnHint: 'İade etmeniz gereken tarih: {date}',
-    successMessage: 'İşlem başarılı! Kitap ödünç alındı.',
+    successMessage: 'Kitap ödünç talebi gönderildi.',
     terms: 'Kitabı temiz ve özenli kullanmayı kabul ediyorum.',
     loanDuration: 'Ödünç süresi: {days} gün',
     cancel: 'İptal',

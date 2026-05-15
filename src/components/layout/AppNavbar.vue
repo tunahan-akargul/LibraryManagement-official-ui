@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/store/auth'
+import FeedbackDialog from '@/components/feedback/FeedbackDialog.vue'
 
 const props = defineProps<{
   showHamburger: boolean
@@ -14,6 +16,11 @@ const emit = defineEmits<{
 const route = useRoute()
 const { t, locale } = useI18n()
 const auth = useAuthStore()
+
+const feedbackOpen = ref(false)
+function openFeedback() {
+  feedbackOpen.value = true
+}
 
 // Admin paneline (admin-ui) yönlendirme — sadece role === 'admin' iken gösterilir.
 // Doğrudan /login sayfasına gönderiyoruz; yetkili tekrar giriş yapmak zorunda
@@ -57,6 +64,18 @@ const toggleLocale = () => {
 
     <div class="topbar__right">
       <v-btn
+        variant="tonal"
+        color="primary"
+        size="small"
+        density="comfortable"
+        prepend-icon="mdi-message-draw"
+        class="feedback-btn"
+        @click="openFeedback"
+      >
+        Talep / Şikayet
+      </v-btn>
+
+      <v-btn
         v-if="auth.isAdmin"
         variant="flat"
         color="primary"
@@ -83,6 +102,8 @@ const toggleLocale = () => {
       </v-btn>
     </div>
   </header>
+
+  <FeedbackDialog v-model="feedbackOpen" />
 </template>
 
 <style scoped>
@@ -139,7 +160,8 @@ const toggleLocale = () => {
   gap: 10px;
 }
 
-.admin-btn {
+.admin-btn,
+.feedback-btn {
   font-size: 0.75rem !important;
   font-weight: 600 !important;
   text-transform: none;

@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useBookStore } from '@/store/books'
 import BorrowDialog    from '@/components/books/BorrowDialog.vue'
+import FeedbackDialog  from '@/components/feedback/FeedbackDialog.vue'
 import BookDetailInfo    from '@/views/details/BookDetailInfo.vue'
 import BookDetailStatus  from '@/views/details/BookDetailStatus.vue'
 import BookDetailActions from '@/views/details/BookDetailActions.vue'
@@ -20,6 +21,7 @@ const coverError  = ref(false)
 
 // ── Dialog & Snackbar ─────────────────────────────────────
 const dialogOpen   = ref(false)
+const feedbackOpen = ref(false)
 const snackbar     = ref(false)
 const snackbarText = ref('')
 
@@ -207,6 +209,12 @@ function onBorrowCancel() {
             :book="bookStore.currentBook"
             @borrow="dialogOpen = true"
           />
+
+          <!-- Bu kitap için bildirim -->
+          <button class="report-btn" type="button" @click="feedbackOpen = true">
+            <v-icon icon="mdi-flag-outline" size="16" />
+            <span>Bu kitap için talep / şikayet bildir</span>
+          </button>
         </div>
       </div>
     </div>
@@ -225,6 +233,12 @@ function onBorrowCancel() {
         @cancel="onBorrowCancel"
       />
     </v-dialog>
+
+    <!-- FeedbackDialog (book-scoped) -->
+    <FeedbackDialog
+      v-model="feedbackOpen"
+      :book="bookStore.currentBook"
+    />
 
     <!-- Başarı Snackbar -->
     <v-snackbar
@@ -251,6 +265,28 @@ function onBorrowCancel() {
 .detail-view {
   max-width: 1100px;
   padding-bottom: 48px;
+}
+
+.report-btn {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(var(--v-theme-on-surface), 0.55);
+  background: transparent;
+  border: 1px dashed rgba(var(--v-border-color), 0.25);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.report-btn:hover {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.4);
+  background: rgba(220, 38, 38, 0.04);
 }
 
 .back-btn {
