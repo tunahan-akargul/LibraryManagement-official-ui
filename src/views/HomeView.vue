@@ -4,6 +4,15 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBookStore } from '@/store/books'
 import { useAuthStore } from '@/store/auth'
+import { Doughnut } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+} from 'chart.js'
+
+ChartJS.register(ArcElement, Tooltip, Legend)
 
 const bookStore = useBookStore()
 const auth      = useAuthStore()
@@ -32,6 +41,99 @@ const myActiveLoans = computed(
         ).length
       : 0,
 )
+
+// ── Chart: kategori dağılımı (sadece mevcut kitaplar) ─────
+const CATEGORY_PALETTE = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
+  '#06b6d4', '#a855f7', '#eab308', '#22c55e', '#0ea5e9',
+]
+
+const genreDistribution = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const b of bookStore.books) {
+    if (b.status !== 'available') continue
+    const key = (b.genre?.trim() || 'Diğer') as string
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  return Object.entries(counts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+})
+
+const hasGenres = computed(() => genreDistribution.value.length > 0)
+
+const genreChartData = computed(() => ({
+  labels: genreDistribution.value.map((g) => g.name),
+  datasets: [
+    {
+      data: genreDistribution.value.map((g) => g.count),
+      backgroundColor: genreDistribution.value.map((_, i) => CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]),
+      borderWidth: 0,
+      hoverOffset: 6,
+    },
+  ],
+}))
+
+const genreChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'right' as const,
+      labels: { boxWidth: 12, boxHeight: 12, padding: 12, font: { size: 12 } },
+    },
+    tooltip: {
+      callbacks: {
+        label: (ctx: { label: string; parsed: number; chart: { data: { datasets: { data: number[] }[] } } }) => {
+          const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0)
+          const pct = total ? ((ctx.parsed / total) * 100).toFixed(1) : '0'
+          return `${ctx.label}: ${ctx.parsed} kitap (%${pct})`
+        },
+      },
+    },
+  },
+}))
+
+// ── Kullanıcının kendi ödünç durumu ──────────────────────
+const myLoanBreakdown = computed(() => {
+  const me = auth.currentUser?.id
+  if (!me) return { pending: 0, active: 0, returning: 0, total: 0 }
+  const mine = bookStore.books.filter((b) => b.borrower_id === me)
+  const pending  = mine.filter((b) => b.status === 'borrow_pending').length
+  const active   = mine.filter((b) => b.status === 'borrowed').length
+  const returning = mine.filter((b) => b.status === 'return_pending').length
+  return { pending, active, returning, total: pending + active + returning }
+})
+
+const myChartData = computed(() => ({
+  labels: ['Onay Bekleyen', 'Ödünç Aldıklarım', 'İade Onay Bekleyen'],
+  datasets: [
+    {
+      data: [myLoanBreakdown.value.pending, myLoanBreakdown.value.active, myLoanBreakdown.value.returning],
+      backgroundColor: ['#f59e0b', '#3b82f6', '#a78bfa'],
+      borderWidth: 0,
+      hoverOffset: 6,
+    },
+  ],
+}))
+
+const myChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '60%',
+  plugins: {
+    legend: {
+      position: 'bottom' as const,
+      labels: { boxWidth: 12, boxHeight: 12, padding: 10, font: { size: 11 } },
+    },
+    tooltip: {
+      callbacks: {
+        label: (ctx: { label: string; parsed: number }) => `${ctx.label}: ${ctx.parsed}`,
+      },
+    },
+  },
+}))
 
 // ── Kapak URL'si: önce cover_image, yoksa isbn ile OpenLibrary ────
 const coverUrl = (isbn?: string, cover_image?: string): string | null => {
@@ -223,6 +325,53 @@ const featuredBooks = [
       </div>
     </div>
 
+    <!-- ── Grafiksel Raporlar ── -->
+    <div class="charts-row">
+      <section class="chart-card">
+        <header class="chart-card__head">
+          <div>
+            <h2 class="chart-card__title">Katalog Kategori Dağılımı</h2>
+            <p class="chart-card__sub">Şu an mevcut olan kitapların türlere göre dağılımı</p>
+          </div>
+          <v-icon icon="mdi-chart-donut" color="primary" />
+        </header>
+        <div class="chart-card__body">
+          <div v-if="bookStore.loading && !bookStore.books.length" class="chart-card__loading">
+            <v-progress-circular indeterminate color="primary" size="32" />
+          </div>
+          <div v-else-if="!hasGenres" class="chart-card__empty">
+            <v-icon icon="mdi-chart-arc" size="32" color="grey-lighten-2" />
+            <p>Mevcut kitap bulunmuyor.</p>
+          </div>
+          <div v-else class="chart-card__canvas">
+            <Doughnut :data="genreChartData" :options="genreChartOptions" />
+          </div>
+        </div>
+      </section>
+
+      <section v-if="auth.isAuthenticated" class="chart-card chart-card--compact">
+        <header class="chart-card__head">
+          <div>
+            <h2 class="chart-card__title">Ödünç Durumum</h2>
+            <p class="chart-card__sub">
+              Aktif ve bekleyen tüm taleplerim ({{ myLoanBreakdown.total }})
+            </p>
+          </div>
+          <v-icon icon="mdi-bookmark-multiple-outline" color="primary" />
+        </header>
+        <div class="chart-card__body">
+          <div v-if="myLoanBreakdown.total === 0" class="chart-card__empty">
+            <v-icon icon="mdi-book-off-outline" size="32" color="grey-lighten-2" />
+            <p>Aktif bir ödünç işleminiz yok.</p>
+            <router-link to="/books" class="chart-card__empty-link">Katalogu Gez</router-link>
+          </div>
+          <div v-else class="chart-card__canvas chart-card__canvas--compact">
+            <Doughnut :data="myChartData" :options="myChartOptions" />
+          </div>
+        </div>
+      </section>
+    </div>
+
     <!-- ── Recently Added ── -->
     <div class="section-header">
       <h2 class="section-title">{{ $t('dashboard.recentlyAdded') }}</h2>
@@ -396,6 +545,88 @@ const featuredBooks = [
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
 }
+
+/* ── Charts row ── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+@media (max-width: 960px) {
+  .charts-row { grid-template-columns: 1fr; }
+}
+
+.chart-card {
+  border-radius: 16px;
+  border: 1.5px solid rgba(var(--v-border-color), 0.09);
+  background: rgb(var(--v-theme-surface));
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.chart-card__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgb(var(--v-theme-on-surface));
+  margin: 0;
+}
+
+.chart-card__sub {
+  font-size: 0.75rem;
+  color: rgba(var(--v-theme-on-surface), 0.45);
+  margin: 2px 0 0 0;
+}
+
+.chart-card__body {
+  flex: 1;
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-card__canvas {
+  position: relative;
+  width: 100%;
+  height: 260px;
+}
+
+.chart-card__canvas--compact {
+  height: 220px;
+}
+
+.chart-card__loading,
+.chart-card__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: rgba(var(--v-theme-on-surface), 0.45);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.chart-card__empty-link {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgb(var(--v-theme-primary));
+  text-decoration: none;
+  margin-top: 2px;
+}
+
+.chart-card__empty-link:hover { opacity: 0.7; }
 
 /* ── Section Header ── */
 .section-header {
